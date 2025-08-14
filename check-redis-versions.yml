@@ -1,0 +1,51 @@
+---
+- name: Check Available Redis Versions
+  hosts: redis_cluster[0]
+  become: yes
+  gather_facts: yes
+  
+  tasks:
+    - name: Install prerequisites for Redis repository
+      apt:
+        name:
+          - lsb-release
+          - curl
+          - gpg
+        state: present
+
+    - name: Add Redis GPG key
+      ansible.builtin.get_url:
+        url: https://packages.redis.io/gpg
+        dest: /tmp/redis.gpg
+        mode: '0644'
+
+    - name: Import Redis GPG key
+      ansible.builtin.shell: |
+        gpg --dearmor < /tmp/redis.gpg > /usr/share/keyrings/redis-archive-keyring.gpg
+      args:
+        creates: /usr/share/keyrings/redis-archive-keyring.gpg
+
+    - name: Set permissions on Redis keyring
+      file:
+        path: /usr/share/keyrings/redis-archive-keyring.gpg
+        mode: '0644'
+
+    - name: Add Redis repository
+      ansible.builtin.lineinfile:
+        path: /etc/apt/sources.list.d/redis.list
+        line: "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb {{ ansible_distribution_release }} main"
+        create: yes
+        mode: '0644'
+
+    - name: Update apt cache after adding Redis repository
+      apt:
+        update_cache: yes
+
+    - name: Check available Redis versions
+      shell: apt policy redis
+      register: redis_versions
+      changed_when: false
+
+    - name: Display available Redis versions
+      debug:
+        var: redis_versions.stdout_lines

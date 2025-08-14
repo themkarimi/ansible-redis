@@ -1,6 +1,6 @@
 ---
 # Redis Configuration
-redis_version: "7.0.15"
+redis_version: ""  # Leave empty for latest, or specify version like "6:7.4.2-1rl1~jammy1"
 redis_port: 6379
 redis_bind_interface: "0.0.0.0"
 redis_password: ""  # Set a strong password for production
