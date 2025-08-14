@@ -1,0 +1,28 @@
+---
+- name: Setup Redis Sentinel Cluster
+  hosts: redis_cluster
+  become: yes
+  gather_facts: yes
+  
+  roles:
+    - redis-sentinel
+
+- name: Configure Redis Master-Slave Replication
+  hosts: redis_cluster
+  become: yes
+  gather_facts: yes
+  serial: 1
+  
+  tasks:
+    - name: Configure Redis slaves
+      include_tasks: tasks/configure_replication.yml
+      when: inventory_hostname != groups['redis_cluster'][0]
+
+- name: Start and Configure Sentinel
+  hosts: redis_cluster
+  become: yes
+  gather_facts: yes
+  
+  tasks:
+    - name: Start Sentinel services
+      include_tasks: tasks/start_sentinel.yml

@@ -1,0 +1,56 @@
+---
+- name: Test Redis Cluster
+  hosts: redis_cluster
+  gather_facts: no
+  
+  tasks:
+    - name: Check Redis service status
+      systemd:
+        name: redis
+      register: redis_status
+
+    - name: Check Sentinel service status
+      systemd:
+        name: redis-sentinel
+      register: sentinel_status
+
+    - name: Test Redis connectivity
+      command: redis-cli -h {{ ansible_default_ipv4.address }} -p {{ redis_port }} ping
+      register: redis_ping
+      changed_when: false
+
+    - name: Test Sentinel connectivity
+      command: redis-cli -h {{ ansible_default_ipv4.address }} -p {{ sentinel_port }} ping
+      register: sentinel_ping
+      changed_when: false
+
+    - name: Display service status
+      debug:
+        msg:
+          - "Redis service: {{ redis_status.status.ActiveState }}"
+          - "Sentinel service: {{ sentinel_status.status.ActiveState }}"
+          - "Redis ping: {{ redis_ping.stdout }}"
+          - "Sentinel ping: {{ sentinel_ping.stdout }}"
+
+- name: Cluster Health Check
+  hosts: redis_cluster[0]
+  gather_facts: no
+  
+  tasks:
+    - name: Get master info
+      command: redis-cli -p {{ redis_port }} info replication
+      register: master_info
+      changed_when: false
+
+    - name: Get sentinel masters
+      command: redis-cli -p {{ sentinel_port }} sentinel masters
+      register: sentinel_masters_info
+      changed_when: false
+
+    - name: Display cluster status
+      debug:
+        msg:
+          - "=== Master Replication Info ==="
+          - "{{ master_info.stdout_lines }}"
+          - "=== Sentinel Masters Info ==="
+          - "{{ sentinel_masters_info.stdout_lines }}"

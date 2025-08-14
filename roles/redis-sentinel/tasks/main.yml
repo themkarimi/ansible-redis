@@ -1,0 +1,109 @@
+---
+- name: Update apt cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Install Redis dependencies
+  apt:
+    name:
+      - wget
+      - build-essential
+      - tcl
+      - software-properties-common
+    state: present
+
+- name: Create redis user
+  user:
+    name: "{{ redis_user }}"
+    system: yes
+    shell: /bin/false
+    home: "{{ redis_dir }}"
+    createhome: no
+
+- name: Create Redis directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ redis_user }}"
+    group: "{{ redis_group }}"
+    mode: '0755'
+  loop:
+    - "{{ redis_dir }}"
+    - "{{ redis_config_dir }}"
+    - "{{ redis_log_dir }}"
+    - "/var/run/redis"
+
+- name: Download Redis source
+  get_url:
+    url: "http://download.redis.io/releases/redis-{{ redis_version }}.tar.gz"
+    dest: "/tmp/redis-{{ redis_version }}.tar.gz"
+    mode: '0644'
+
+- name: Extract Redis source
+  unarchive:
+    src: "/tmp/redis-{{ redis_version }}.tar.gz"
+    dest: "/tmp"
+    remote_src: yes
+    creates: "/tmp/redis-{{ redis_version }}"
+
+- name: Compile Redis
+  make:
+    chdir: "/tmp/redis-{{ redis_version }}"
+    jobs: "{{ ansible_processor_vcpus | default(1) }}"
+
+- name: Install Redis
+  make:
+    chdir: "/tmp/redis-{{ redis_version }}"
+    target: install
+
+- name: Create Redis configuration
+  template:
+    src: redis.conf.j2
+    dest: "{{ redis_config_dir }}/redis.conf"
+    owner: "{{ redis_user }}"
+    group: "{{ redis_group }}"
+    mode: '0640'
+  notify:
+    - restart redis
+
+- name: Create Sentinel configuration
+  template:
+    src: sentinel.conf.j2
+    dest: "{{ redis_config_dir }}/sentinel.conf"
+    owner: "{{ redis_user }}"
+    group: "{{ redis_group }}"
+    mode: '0640'
+  notify:
+    - restart sentinel
+
+- name: Create Redis systemd service
+  template:
+    src: redis.service.j2
+    dest: /etc/systemd/system/redis.service
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart redis
+
+- name: Create Sentinel systemd service
+  template:
+    src: sentinel.service.j2
+    dest: /etc/systemd/system/redis-sentinel.service
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart sentinel
+
+- name: Enable and start Redis service
+  systemd:
+    name: redis
+    enabled: yes
+    state: started
+    daemon_reload: yes
+
+- name: Wait for Redis to be ready
+  wait_for:
+    port: "{{ redis_port }}"
+    host: "{{ ansible_default_ipv4.address }}"
+    timeout: 30

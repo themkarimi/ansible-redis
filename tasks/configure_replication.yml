@@ -1,0 +1,46 @@
+---
+- name: Wait for Redis master to be ready
+  wait_for:
+    port: "{{ redis_port }}"
+    host: "{{ redis_master_ip }}"
+    timeout: 60
+  delegate_to: localhost
+  run_once: true
+
+- name: Configure Redis slave replication
+  redis:
+    command: config
+    arguments:
+      - set
+      - replicaof
+      - "{{ redis_master_ip }} {{ redis_port }}"
+    login_host: "{{ ansible_default_ipv4.address }}"
+    login_port: "{{ redis_port }}"
+    login_password: "{{ redis_password | default(omit) }}"
+  when: redis_role == 'slave'
+
+- name: Set slave priority
+  redis:
+    command: config
+    arguments:
+      - set
+      - replica-priority
+      - "100"
+    login_host: "{{ ansible_default_ipv4.address }}"
+    login_port: "{{ redis_port }}"
+    login_password: "{{ redis_password | default(omit) }}"
+  when: redis_role == 'slave'
+
+- name: Verify replication status
+  redis:
+    command: info
+    arguments:
+      - replication
+    login_host: "{{ ansible_default_ipv4.address }}"
+    login_port: "{{ redis_port }}"
+    login_password: "{{ redis_password | default(omit) }}"
+  register: replication_info
+
+- name: Display replication status
+  debug:
+    var: replication_info.value

@@ -1,0 +1,16 @@
+---
+- name: reload systemd
+  systemd:
+    daemon_reload: yes
+
+- name: restart redis
+  systemd:
+    name: redis
+    state: restarted
+    enabled: yes
+
+- name: restart sentinel
+  systemd:
+    name: redis-sentinel
+    state: restarted
+    enabled: yes

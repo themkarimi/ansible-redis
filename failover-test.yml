@@ -1,0 +1,49 @@
+---
+- name: Failover Test
+  hosts: redis_cluster
+  gather_facts: no
+  serial: 1
+  
+  tasks:
+    - name: Get current master from sentinel
+      command: redis-cli -p {{ sentinel_port }} sentinel get-master-addr-by-name {{ redis_master_name }}
+      register: current_master
+      changed_when: false
+      run_once: true
+
+    - name: Display current master
+      debug:
+        msg: "Current master: {{ current_master.stdout_lines[0] }}:{{ current_master.stdout_lines[1] }}"
+      run_once: true
+
+    - name: Force failover (CAUTION: This will trigger failover)
+      command: redis-cli -p {{ sentinel_port }} sentinel failover {{ redis_master_name }}
+      when: inventory_hostname == groups['redis_cluster'][0]
+      tags: 
+        - never
+        - failover
+
+    - name: Wait for failover to complete
+      pause:
+        seconds: 10
+      when: inventory_hostname == groups['redis_cluster'][0]
+      tags:
+        - never 
+        - failover
+
+    - name: Get new master after failover
+      command: redis-cli -p {{ sentinel_port }} sentinel get-master-addr-by-name {{ redis_master_name }}
+      register: new_master
+      changed_when: false
+      run_once: true
+      tags:
+        - never
+        - failover
+
+    - name: Display new master
+      debug:
+        msg: "New master: {{ new_master.stdout_lines[0] }}:{{ new_master.stdout_lines[1] }}"
+      run_once: true
+      tags:
+        - never
+        - failover

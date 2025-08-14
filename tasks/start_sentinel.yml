@@ -1,0 +1,31 @@
+---
+- name: Enable and start Redis Sentinel service
+  systemd:
+    name: redis-sentinel
+    enabled: yes
+    state: started
+    daemon_reload: yes
+
+- name: Wait for Sentinel to be ready
+  wait_for:
+    port: "{{ sentinel_port }}"
+    host: "{{ ansible_default_ipv4.address }}"
+    timeout: 30
+
+- name: Check Sentinel masters
+  command: redis-cli -p {{ sentinel_port }} sentinel masters
+  register: sentinel_masters
+  changed_when: false
+
+- name: Display Sentinel masters
+  debug:
+    var: sentinel_masters.stdout_lines
+
+- name: Check Sentinel slaves
+  command: redis-cli -p {{ sentinel_port }} sentinel slaves {{ redis_master_name }}
+  register: sentinel_slaves
+  changed_when: false
+
+- name: Display Sentinel slaves
+  debug:
+    var: sentinel_slaves.stdout_lines

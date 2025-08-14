@@ -1,0 +1,34 @@
+# Redis Sentinel Configuration File
+# {{ ansible_managed }}
+
+# Basic Configuration
+port {{ sentinel_port }}
+bind {{ redis_bind_interface }}
+protected-mode {{ redis_protected_mode }}
+
+# Working Directory
+dir {{ redis_dir }}
+
+# Logging
+logfile {{ redis_log_dir }}/sentinel.log
+loglevel notice
+
+# Sentinel Configuration
+sentinel monitor {{ redis_master_name }} {{ redis_master_ip }} {{ redis_port }} {{ sentinel_quorum }}
+
+# Timeouts and Intervals
+sentinel down-after-milliseconds {{ redis_master_name }} {{ sentinel_down_after_milliseconds }}
+sentinel parallel-syncs {{ redis_master_name }} {{ sentinel_parallel_syncs }}
+sentinel failover-timeout {{ redis_master_name }} {{ sentinel_failover_timeout }}
+
+# Authentication
+{% if redis_password %}
+sentinel auth-pass {{ redis_master_name }} {{ redis_password }}
+{% endif %}
+
+# Notification Scripts (optional)
+# sentinel notification-script {{ redis_master_name }} /path/to/notification-script.sh
+# sentinel client-reconfig-script {{ redis_master_name }} /path/to/reconfig-script.sh
+
+# Deny dangerous commands in Sentinel mode
+sentinel deny-scripts-reconfig yes
