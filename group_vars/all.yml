@@ -1,10 +1,10 @@
 ---
 # Redis Configuration
-redis_version: ""  # Leave empty for latest, or specify version like "6:7.4.2-1rl1~jammy1"
+redis_version: "6:8.2.0-1rl1~jammy1"  # Leave empty for latest, or specify version like "6:7.4.2-1rl1~jammy1"
 redis_port: 6379
 redis_bind_interface: "0.0.0.0"
 redis_password: ""  # Set a strong password for production
-redis_maxmemory: "1gb"
+redis_maxmemory: "4gb"
 redis_maxmemory_policy: "allkeys-lru"
 
 # Redis Directories
@@ -38,5 +38,5 @@ redis_save_config:
   - "300 10"  # Save if at least 10 keys changed in 300 seconds
   - "60 10000" # Save if at least 10000 keys changed in 60 seconds
 
-redis_appendonly: "yes"
+redis_appendonly: "no"
 redis_appendfsync: "everysec"

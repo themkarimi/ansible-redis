@@ -6,7 +6,7 @@ Requires=redis.service
 [Service]
 User={{ redis_user }}
 Group={{ redis_group }}
-ExecStart=/usr/bin/redis-sentinel {{ redis_config_dir }}/sentinel.conf
+ExecStart={{ redis_sentinel_binary | default('/usr/bin/redis-sentinel') }} {{ redis_config_dir }}/sentinel.conf
 ExecStop=/usr/bin/redis-cli -p {{ sentinel_port }} shutdown
 Restart=always
 RestartSec=3

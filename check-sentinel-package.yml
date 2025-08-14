@@ -1,0 +1,78 @@
+---
+- name: Check Redis Sentinel Package Availability
+  hosts: redis_cluster
+  become: yes
+  gather_facts: yes
+  
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Add Redis GPG key
+      ansible.builtin.get_url:
+        url: https://packages.redis.io/gpg
+        dest: /tmp/redis.gpg
+        mode: '0644'
+
+    - name: Import Redis GPG key
+      ansible.builtin.shell: |
+        gpg --dearmor < /tmp/redis.gpg > /usr/share/keyrings/redis-archive-keyring.gpg
+      args:
+        creates: /usr/share/keyrings/redis-archive-keyring.gpg
+
+    - name: Set permissions on Redis keyring
+      file:
+        path: /usr/share/keyrings/redis-archive-keyring.gpg
+        mode: '0644'
+
+    - name: Add Redis repository
+      ansible.builtin.lineinfile:
+        path: /etc/apt/sources.list.d/redis.list
+        line: "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb {{ ansible_distribution_release }} main"
+        create: yes
+        mode: '0644'
+
+    - name: Update apt cache after adding Redis repository
+      apt:
+        update_cache: yes
+
+    - name: Check available Redis packages
+      shell: apt-cache search redis | grep -E "^redis"
+      register: redis_packages
+
+    - name: Display available Redis packages
+      debug:
+        msg: "{{ redis_packages.stdout_lines }}"
+
+    - name: Check if redis-sentinel package exists
+      shell: apt-cache show redis-sentinel
+      register: sentinel_package_check
+      ignore_errors: yes
+
+    - name: Display sentinel package status
+      debug:
+        msg: "{{ 'Redis Sentinel package is available' if sentinel_package_check.rc == 0 else 'Redis Sentinel package not found as separate package' }}"
+
+    - name: Check Redis package contents for sentinel
+      shell: apt-cache show redis | grep -i sentinel || echo "No sentinel mentioned in redis package"
+      register: redis_contents
+
+    - name: Display Redis package sentinel info
+      debug:
+        msg: "{{ redis_contents.stdout_lines }}"
+
+    - name: Check if redis-server package includes sentinel
+      shell: |
+        if dpkg -l redis-server 2>/dev/null | grep -q redis-server; then
+          dpkg -L redis-server | grep sentinel || echo "No sentinel files in redis-server"
+        else
+          echo "redis-server not installed"
+        fi
+      register: redis_server_contents
+      ignore_errors: yes
+
+    - name: Display redis-server sentinel content
+      debug:
+        msg: "{{ redis_server_contents.stdout_lines }}"

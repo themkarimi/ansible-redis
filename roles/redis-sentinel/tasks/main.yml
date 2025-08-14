@@ -40,10 +40,40 @@
   apt:
     update_cache: yes
 
-- name: Install Redis
+- name: Install Redis and Redis Sentinel
+  apt:
+    name: 
+      - "redis{% if redis_version %}={{ redis_version }}{% endif %}"
+      - "redis-sentinel{% if redis_version %}={{ redis_version }}{% endif %}"
+    state: present
+  ignore_errors: yes
+  register: redis_install_result
+
+- name: Install Redis only if Sentinel package failed
   apt:
     name: "redis{% if redis_version %}={{ redis_version }}{% endif %}"
     state: present
+  when: redis_install_result is failed
+
+- name: Install redis-tools if needed
+  apt:
+    name: redis-tools
+    state: present
+  ignore_errors: yes
+
+- name: Check if redis-sentinel binary exists
+  stat:
+    path: /usr/bin/redis-sentinel
+  register: sentinel_binary
+
+- name: Find redis-sentinel binary location
+  shell: which redis-sentinel || find /usr -name "redis-sentinel" -type f 2>/dev/null | head -1
+  register: sentinel_path
+  when: not sentinel_binary.stat.exists
+
+- name: Set sentinel binary path
+  set_fact:
+    redis_sentinel_binary: "{{ sentinel_path.stdout if not sentinel_binary.stat.exists else '/usr/bin/redis-sentinel' }}"
 
 - name: Stop default Redis service (we'll configure our own)
   systemd:
@@ -120,5 +150,18 @@
 - name: Wait for Redis to be ready
   wait_for:
     port: "{{ redis_port }}"
+    host: "{{ ansible_default_ipv4.address }}"
+    timeout: 30
+
+- name: Enable and start Redis Sentinel service
+  systemd:
+    name: redis-sentinel
+    enabled: yes
+    state: started
+    daemon_reload: yes
+
+- name: Wait for Sentinel to be ready
+  wait_for:
+    port: "{{ sentinel_port }}"
     host: "{{ ansible_default_ipv4.address }}"
     timeout: 30

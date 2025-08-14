@@ -4,5 +4,4 @@ redis-node-2 ansible_host=172.20.29.32 redis_role=slave
 redis-node-3 ansible_host=172.20.29.33 redis_role=slave
 
 [redis_cluster:vars]
-ansible_user=ubuntu
 ansible_python_interpreter=/usr/bin/python3
