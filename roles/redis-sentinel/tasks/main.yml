@@ -81,78 +81,32 @@
     state: stopped
     enabled: no
 
-- name: Create redis user (if not exists from package)
-  user:
-    name: "{{ redis_user }}"
-    system: yes
-    shell: /bin/false
-    home: "{{ redis_dir }}"
-    createhome: no
-  become: yes
-
-- name: Verify redis user exists
-  command: id {{ redis_user }}
-  register: redis_user_check
-  changed_when: false
-  become: yes
-
-- name: Display redis user info
+- name: Skip user creation (using root)
   debug:
-    msg: "Redis user info: {{ redis_user_check.stdout }}"
-
-- name: Ensure Redis directories exist with correct permissions
-  file:
-    path: "{{ item.path }}"
-    state: directory
-    owner: "{{ item.owner | default('root') }}"
-    group: "{{ item.group | default('root') }}"
-    mode: "{{ item.mode }}"
+    msg: "Running Redis services as root user"
   become: yes
-  register: dir_creation_result
-  ignore_errors: yes
-  loop:
-    - { path: "{{ redis_dir }}", owner: "{{ redis_user }}", group: "{{ redis_group }}", mode: '0755' }
-    - { path: "{{ redis_config_dir }}", owner: "root", group: "{{ redis_group }}", mode: '0755' }
-    - { path: "{{ redis_log_dir }}", owner: "{{ redis_user }}", group: "{{ redis_group }}", mode: '0755' }
-    - { path: "/var/run/redis", owner: "{{ redis_user }}", group: "{{ redis_group }}", mode: '0755' }
 
-- name: Check if primary config directory creation failed
-  set_fact:
-    config_dir_failed: "{{ dir_creation_result.results[1].failed | default(false) }}"
-
-- name: Create alternative config directory if primary failed
+- name: Create Redis directories with root ownership
   file:
-    path: "{{ redis_config_dir_alt }}"
+    path: "{{ item }}"
     state: directory
-    owner: "{{ redis_user }}"
-    group: "{{ redis_group }}"
+    owner: root
+    group: root
     mode: '0755'
   become: yes
-  when: config_dir_failed | bool
-  register: alt_dir_creation
-
-- name: Use alternative config directory if primary failed
-  set_fact:
-    redis_config_dir: "{{ redis_config_dir_alt }}"
-  when: config_dir_failed | bool and alt_dir_creation is succeeded
-
-- name: Verify directory permissions
-  stat:
-    path: "{{ redis_config_dir }}"
-  register: config_dir_stat
-  become: yes
-
-- name: Display config directory info
-  debug:
-    msg: "Config directory {{ redis_config_dir }} - exists: {{ config_dir_stat.stat.exists }}, owner: {{ config_dir_stat.stat.pw_name | default('unknown') }}, group: {{ config_dir_stat.stat.gr_name | default('unknown') }}, mode: {{ config_dir_stat.stat.mode | default('unknown') }}"
+  loop:
+    - "{{ redis_dir }}"
+    - "{{ redis_config_dir }}"
+    - "{{ redis_log_dir }}"
+    - "/var/run/redis"
 
 - name: Create Redis configuration
   template:
     src: redis.conf.j2
     dest: "{{ redis_config_dir }}/redis.conf"
-    owner: "{{ redis_user }}"
-    group: "{{ redis_group }}"
-    mode: '0640'
+    owner: root
+    group: root
+    mode: '0644'
     backup: yes
   become: yes
   notify:
@@ -162,9 +116,9 @@
   template:
     src: sentinel.conf.j2
     dest: "{{ redis_config_dir }}/sentinel.conf"
-    owner: "{{ redis_user }}"
-    group: "{{ redis_group }}"
-    mode: '0640'
+    owner: root
+    group: root
+    mode: '0644'
     backup: yes
   become: yes
   notify:

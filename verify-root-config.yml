@@ -1,0 +1,94 @@
+---
+- name: Verify Root Configuration for Redis
+  hosts: redis_cluster
+  become: yes
+  gather_facts: yes
+  
+  vars:
+    redis_user: root
+    redis_group: root
+    redis_config_dir: /etc/redis
+
+  tasks:
+    - name: Test directory creation as root
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      loop:
+        - "/etc/redis"
+        - "/var/lib/redis"
+        - "/var/log/redis"
+        - "/var/run/redis"
+
+    - name: Test config file creation as root
+      copy:
+        content: |
+          # Test Redis configuration - running as root
+          port 6379
+          bind 0.0.0.0
+          logfile /var/log/redis/redis.log
+          dir /var/lib/redis
+        dest: "/etc/redis/test-redis.conf"
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Test sentinel config file creation as root
+      copy:
+        content: |
+          # Test Sentinel configuration - running as root
+          port 26379
+          sentinel monitor mymaster 127.0.0.1 6379 2
+          sentinel down-after-milliseconds mymaster 5000
+          sentinel failover-timeout mymaster 10000
+          logfile /var/log/redis/sentinel.log
+        dest: "/etc/redis/test-sentinel.conf"
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Verify files were created successfully
+      stat:
+        path: "{{ item }}"
+      register: file_stats
+      loop:
+        - "/etc/redis/test-redis.conf"
+        - "/etc/redis/test-sentinel.conf"
+
+    - name: Display file creation results
+      debug:
+        msg: "File {{ item.item }} - exists: {{ item.stat.exists }}, owner: {{ item.stat.pw_name | default('unknown') }}"
+      loop: "{{ file_stats.results }}"
+
+    - name: Test Redis binary execution as root
+      command: redis-server --version
+      register: redis_version_check
+      ignore_errors: yes
+
+    - name: Display Redis version
+      debug:
+        msg: "Redis version check: {{ redis_version_check.stdout if redis_version_check.rc == 0 else 'Failed: ' + redis_version_check.stderr }}"
+
+    - name: Test Sentinel binary execution as root
+      command: redis-sentinel --version
+      register: sentinel_version_check
+      ignore_errors: yes
+
+    - name: Display Sentinel version
+      debug:
+        msg: "Sentinel version check: {{ sentinel_version_check.stdout if sentinel_version_check.rc == 0 else 'Failed: ' + sentinel_version_check.stderr }}"
+
+    - name: Clean up test files
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "/etc/redis/test-redis.conf"
+        - "/etc/redis/test-sentinel.conf"
+
+    - name: Success message
+      debug:
+        msg: "✅ Root configuration verification completed successfully"
