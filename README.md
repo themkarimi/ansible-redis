@@ -69,6 +69,45 @@ redis-cli -h <master-ip> -p 6379
 redis-cli -h <any-server-ip> -p 26379 sentinel masters
 ```
 
+## Troubleshooting
+
+### Permission Issues
+
+If you encounter permission errors (e.g., for `/etc/redis/sentinel.conf`):
+
+1. Run the debug playbook to check permissions:
+   ```bash
+   ansible-playbook -i inventory/hosts debug-permissions.yml
+   ```
+
+2. Check if the redis user exists and has proper permissions:
+   ```bash
+   ansible -i inventory/hosts redis_cluster -m command -a "id redis" --become
+   ```
+
+3. Verify directory permissions:
+   ```bash
+   ansible -i inventory/hosts redis_cluster -m command -a "ls -la /etc/redis" --become
+   ```
+
+### Package Issues
+
+If redis-sentinel package is not found:
+
+1. Check available packages:
+   ```bash
+   ansible-playbook -i inventory/hosts check-sentinel-package.yml
+   ```
+
+2. Verify Redis repository is properly added:
+   ```bash
+   ansible -i inventory/hosts redis_cluster -m command -a "apt-cache policy redis" --become
+   ```
+
+### Alternative Configuration Directory
+
+If `/etc/redis` cannot be created, the playbook will automatically fall back to `/opt/redis/conf`.
+
 ## Security Notes
 
 - Consider setting up firewall rules

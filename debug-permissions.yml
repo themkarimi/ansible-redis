@@ -1,0 +1,101 @@
+---
+- name: Debug Redis Permissions
+  hosts: redis_cluster
+  become: yes
+  gather_facts: yes
+  
+  vars:
+    redis_user: redis
+    redis_group: redis
+    redis_config_dir: /etc/redis
+    redis_dir: /var/lib/redis
+    redis_log_dir: /var/log/redis
+
+  tasks:
+    - name: Check if redis user exists
+      command: id {{ redis_user }}
+      register: user_check
+      ignore_errors: yes
+
+    - name: Display user status
+      debug:
+        msg: "{{ 'Redis user exists: ' + user_check.stdout if user_check.rc == 0 else 'Redis user does not exist' }}"
+
+    - name: Check current user running Ansible
+      command: whoami
+      register: current_user
+
+    - name: Display current user
+      debug:
+        msg: "Current user: {{ current_user.stdout }}"
+
+    - name: Check sudo privileges
+      command: sudo -n true
+      register: sudo_check
+      ignore_errors: yes
+
+    - name: Display sudo status
+      debug:
+        msg: "{{ 'Sudo available' if sudo_check.rc == 0 else 'Sudo not available or requires password' }}"
+
+    - name: Check directory existence and permissions
+      stat:
+        path: "{{ item }}"
+      register: dir_stats
+      loop:
+        - "{{ redis_config_dir }}"
+        - "{{ redis_dir }}"
+        - "{{ redis_log_dir }}"
+        - "/var/run/redis"
+
+    - name: Display directory information
+      debug:
+        msg: 
+          - "Directory: {{ item.item }}"
+          - "Exists: {{ item.stat.exists }}"
+          - "Owner: {{ item.stat.pw_name | default('N/A') }}"
+          - "Group: {{ item.stat.gr_name | default('N/A') }}"
+          - "Mode: {{ item.stat.mode | default('N/A') }}"
+          - "Writable: {{ item.stat.writeable | default('N/A') }}"
+      loop: "{{ dir_stats.results }}"
+
+    - name: Test directory creation manually
+      file:
+        path: /tmp/test-redis-dir
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      register: test_creation
+
+    - name: Display test creation result
+      debug:
+        msg: "Test directory creation: {{ 'successful' if test_creation is succeeded else 'failed' }}"
+
+    - name: Test file creation in /etc
+      copy:
+        content: "test"
+        dest: /etc/test-redis-file
+        mode: '0644'
+      register: test_file_creation
+      ignore_errors: yes
+
+    - name: Display test file creation result
+      debug:
+        msg: "Test file creation in /etc: {{ 'successful' if test_file_creation is succeeded else 'failed - ' + (test_file_creation.msg | default('unknown error')) }}"
+
+    - name: Clean up test file
+      file:
+        path: /etc/test-redis-file
+        state: absent
+      ignore_errors: yes
+
+    - name: Check SELinux status (if applicable)
+      command: getenforce
+      register: selinux_status
+      ignore_errors: yes
+
+    - name: Display SELinux status
+      debug:
+        msg: "SELinux status: {{ selinux_status.stdout | default('Not available') }}"
+      when: selinux_status.rc == 0

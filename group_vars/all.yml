@@ -10,6 +10,7 @@ redis_maxmemory_policy: "allkeys-lru"
 # Redis Directories
 redis_dir: "/var/lib/redis"
 redis_config_dir: "/etc/redis"
+redis_config_dir_alt: "/opt/redis/conf"  # Alternative config directory
 redis_log_dir: "/var/log/redis"
 redis_pid_file: "/var/run/redis/redis-server.pid"
 
