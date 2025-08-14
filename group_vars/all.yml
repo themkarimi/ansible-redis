@@ -30,7 +30,7 @@ redis_user: "root"
 redis_group: "root"
 
 # Security
-redis_protected_mode: "yes"
+redis_protected_mode: "no"
 redis_tcp_keepalive: 300
 
 # Persistence
